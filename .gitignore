@@ -5,4 +5,4 @@ env/
 __pycache__/
 *.py[cod]
 .vscode/
-.idea/
+.idea/route-accident-bot/
