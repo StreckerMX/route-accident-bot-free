@@ -71,6 +71,18 @@ Pega un enlace de Google Maps, pulsa **Analizar enlace** y luego **Iniciar monit
 
 ---
 
+## Desinstalación
+
+Para eliminar el bot por completo (código, `venv`, `.env` y configuración):
+
+```powershell
+.\Uninstall-RouteAccidentBotFree.ps1
+```
+
+El script pide confirmación y la palabra `BORRAR`. Cierra el bot antes de ejecutarlo.
+
+---
+
 ## Obtener las API Keys gratis
 
 ### OpenRouteService
