@@ -5,10 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .ors_routes_client import OrsRoutesClient
-from .route_geometry import point_to_polyline_distance_km
+from .route_geometry import MAX_INCIDENT_DISTANCE_KM, point_to_polyline_distance_km
 from .tomtom_incidents_client import TrafficIncident
-
-MAX_INCIDENT_DISTANCE_KM = 2.0
 
 
 @dataclass

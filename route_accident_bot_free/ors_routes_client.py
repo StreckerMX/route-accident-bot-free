@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Any
 
 import requests
 
 ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
 MAX_ALTERNATIVES_DISTANCE_KM = 95.0
+
+
+@dataclass
+class RoutePreview:
+    distance_km: float
+    duration_minutes: int
 
 
 def _haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
@@ -105,11 +112,31 @@ class OrsRoutesClient:
                 {
                     "index": i,
                     "duration_seconds": int(summary.get("duration", 0)),
-                    "distance_km": round(summary.get("distance", 0), 1),
+                    "distance_km": round(summary.get("distance", 0), 2),
                     "coordinates": geometry.get("coordinates", []),
                 }
             )
         return routes
+
+    def preview_route(
+        self,
+        origin_coords: tuple[float, float],
+        destination_coords: tuple[float, float],
+        avoid_tolls: bool = False,
+    ) -> RoutePreview:
+        routes = self.compute_routes(
+            origin_coords,
+            destination_coords,
+            alternatives=0,
+            avoid_tolls=avoid_tolls,
+        )
+        if not routes:
+            raise ValueError("No se pudo calcular la ruta.")
+        primary = routes[0]
+        return RoutePreview(
+            distance_km=primary["distance_km"],
+            duration_minutes=self.duration_minutes(primary),
+        )
 
     @staticmethod
     def route_label(index: int) -> str:

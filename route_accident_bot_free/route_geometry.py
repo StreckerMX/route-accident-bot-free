@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 EARTH_RADIUS_KM = 6371.0
+MAX_INCIDENT_DISTANCE_KM = 0.05  # 50 metros
 
 
 def haversine_km(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
