@@ -115,6 +115,10 @@ def format_alert_popup_body(result: AlertResult) -> str:
     if result.recommendation.minutes_saved > 0:
         lines.append(f"Ahorro potencial: ~{result.recommendation.minutes_saved} min")
 
+    if result.main_event:
+        lines.append("")
+        lines.append("Usa «Ver retraso en Maps» para abrir el punto exacto del incidente.")
+
     return "\n".join(lines)
 
 
