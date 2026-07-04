@@ -1,4 +1,4 @@
-"""Servicio de monitoreo de rutas con APIs gratuitas."""
+"""Servicio de analisis de rutas con APIs gratuitas."""
 
 from __future__ import annotations
 
@@ -11,10 +11,10 @@ from pathlib import Path
 from typing import Any
 
 import requests
-import yaml
 from dotenv import load_dotenv
 
 from .alert_reporter import format_alert, format_alert_telegram, format_ok_check
+from .config_state import SETTINGS_FILE, load_config, save_config
 from .news_investigator import Investigator
 from .nominatim_geocoder import LocationInfo, NominatimGeocoder
 from .ors_routes_client import OrsRoutesClient
@@ -23,17 +23,7 @@ from .telegram_notifier import TelegramNotifier
 from .tomtom_incidents_client import TomTomIncidentsClient
 from .traffic_analyzer import analyze_routes
 
-SETTINGS_FILE = "RouteAccidentBotFree.Settings.yaml"
-
-
-def load_config(config_path: Path) -> dict[str, Any]:
-    with config_path.open(encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
-
-
-def save_config(config_path: Path, config: dict[str, Any]) -> None:
-    with config_path.open("w", encoding="utf-8") as f:
-        yaml.safe_dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+__all__ = ["RouteMonitor", "load_config", "save_config", "SETTINGS_FILE"]
 
 
 class RouteMonitor:
@@ -57,6 +47,7 @@ class RouteMonitor:
         self._thread: threading.Thread | None = None
         self._last_alert_at: float | None = None
         self._route_note_shown = False
+        self._periodic = False
 
         load_dotenv(base_dir / ".env", encoding="utf-8-sig")
         self._init_clients()
@@ -78,7 +69,7 @@ class RouteMonitor:
         self.origin = route_cfg.get("origin", "").strip()
         self.destination = route_cfg.get("destination", "").strip()
         if not self.origin or not self.destination:
-            raise ValueError("Configura origin y destination")
+            raise ValueError("Configura la ruta con un enlace de Google Maps")
 
         monitor_cfg = self.config.get("monitor", {})
         self.interval = int(monitor_cfg.get("interval_minutes", 45))
@@ -86,6 +77,8 @@ class RouteMonitor:
         self.cooldown = int(monitor_cfg.get("cooldown_minutes", 15))
         self.switch_threshold = int(advisor_cfg.get("recommend_switch_if_saves_minutes", 10))
         self.alternatives = int(advisor_cfg.get("alternative_routes", 2))
+        self.road_preference = route_cfg.get("road_preference", "free")
+        self.avoid_tolls = self.road_preference == "free"
 
         user_agent = f"RouteAccidentBotFree/1.0 ({nominatim_email or 'local'})"
         self.geocoder = NominatimGeocoder(user_agent=user_agent, email=nominatim_email)
@@ -103,12 +96,8 @@ class RouteMonitor:
         self.notify_on_alert = telegram_cfg.get("notify_on_alert", True)
         self.notify_on_ok = telegram_cfg.get("notify_on_ok", False)
 
-        self.origin_coords = self._resolve_coords(
-            self.origin_coords_override, self.origin
-        )
-        self.destination_coords = self._resolve_coords(
-            self.destination_coords_override, self.destination
-        )
+        self.origin_coords = self._resolve_coords(self.origin_coords_override, self.origin)
+        self.destination_coords = self._resolve_coords(self.destination_coords_override, self.destination)
         if not self.origin_coords or not self.destination_coords:
             raise ValueError("No se pudo geocodificar origen o destino.")
 
@@ -122,8 +111,7 @@ class RouteMonitor:
         coords = self.geocoder.forward(label)
         if coords:
             return coords
-        parsed = self._parse_coord_label(label)
-        return parsed
+        return self._parse_coord_label(label)
 
     @staticmethod
     def _parse_coord_label(label: str) -> tuple[float, float] | None:
@@ -140,15 +128,16 @@ class RouteMonitor:
     def _log(self, message: str) -> None:
         self.on_log(message)
 
+    def _road_label(self) -> str:
+        return "Libre (sin cuota)" if self.road_preference == "free" else "Cuota"
+
     def print_banner(self) -> None:
         self._log("=" * 50)
-        self._log("  Route Accident Bot FREE")
+        self._log("  Route Accident Bot FREE - Analisis de ruta")
         self._log("=" * 50)
         self._log(f"  Origen:      {self.origin}")
         self._log(f"  Destino:     {self.destination}")
-        self._log(f"  Intervalo:   cada {self.interval} min")
-        self._log(f"  Umbral:      +{self.delay_threshold} min")
-        self._log("  APIs:        OpenRouteService + TomTom + Nominatim")
+        self._log(f"  Carretera:   {self._road_label()}")
         self._log(f"  Telegram:    {'activo' if self.telegram_enabled else 'desactivado'}")
         self._log("=" * 50)
         self._log("")
@@ -160,6 +149,7 @@ class RouteMonitor:
                 self.origin_coords,
                 self.destination_coords,
                 alternatives=self.alternatives,
+                avoid_tolls=self.avoid_tolls,
             )
 
             if self.routes_client.last_route_note and not self._route_note_shown:
@@ -254,19 +244,28 @@ class RouteMonitor:
         except Exception as exc:
             self._log(f"[{now.strftime('%H:%M:%S')}] Error: {exc}")
 
-    def _loop(self) -> None:
-        self.on_status("Monitoreando")
+    def _analysis_loop(self) -> None:
+        self.on_status("Analizando")
+        self.run_once()
+
+        if not self._periodic:
+            self.on_status("Detenido")
+            return
+
         while not self._stop_event.is_set():
-            self.run_once()
+            self.on_status("Esperando proxima revision")
             if self._stop_event.wait(self.interval * 60):
                 break
+            self.on_status("Analizando")
+            self.run_once()
+
         self.on_status("Detenido")
 
-    def start(self) -> None:
-        if self._thread and self._thread.is_alive():
-            return
+    def start_analysis(self, periodic: bool) -> None:
+        self.stop()
+        self._periodic = periodic
         self._stop_event.clear()
-        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread = threading.Thread(target=self._analysis_loop, daemon=True)
         self._thread.start()
 
     def stop(self) -> None:

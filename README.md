@@ -7,7 +7,7 @@
 
 Versión **100% gratuita** del monitor de rutas. No usa Google Maps API ni requiere tarjeta de crédito.
 
-Monitorea tu ruta, detecta incidentes de tráfico, busca noticias y recomienda si conviene cambiar de ruta.
+Analiza tu ruta, detecta incidentes de tráfico, busca noticias y recomienda si conviene cambiar de ruta.
 
 [English](#english)
 
@@ -37,41 +37,24 @@ Monitorea tu ruta, detecta incidentes de tráfico, busca noticias y recomienda s
 ## Instalación (Windows)
 
 ```powershell
-git clone https://github.com/StreckerMX/route-accident-bot-free.git; cd route-accident-bot-free; Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\Install-RouteAccidentBotFree.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; irm https://raw.githubusercontent.com/StreckerMX/route-accident-bot-free/main/Install-Remote.ps1 | iex
 ```
 
-El instalador pedirá:
-1. API Key de OpenRouteService
-2. API Key de TomTom
-3. Correo para Nominatim
-4. Origen y destino
-5. Telegram *(opcional)*
+Se instala en `%LOCALAPPDATA%\RouteAccidentBotFree` y abre la GUI de configuración (APIs, enlace de Maps, cuota/libre). Vuelve a ejecutar el comando para actualizar sin perder tu configuración.
 
 ---
 
 ## Uso
 
-```powershell
-.\Start-RouteAccidentBotFree.ps1
-```
-
-Se abre la interfaz gráfica. Pega un enlace de Google Maps, pulsa **Analizar enlace** y luego **Iniciar monitoreo**. Usa **Detener** para pausar el monitoreo.
-
-**Configuración por defecto:**
-- Revisión cada **45 minutos**
-- Alerta si retraso o incidente supera **13 minutos**
+Acceso directo **Route Accident Bot FREE** o el mismo comando de instalación. Pulsa **Analizar ruta**; opcionalmente activa revisión automática cada 45 min.
 
 ---
 
 ## Desinstalación
 
-Para eliminar el bot por completo (código, `venv`, `.env` y configuración):
-
 ```powershell
-.\Uninstall-RouteAccidentBotFree.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; irm https://raw.githubusercontent.com/StreckerMX/route-accident-bot-free/main/Uninstall-RouteAccidentBotFree.ps1 | iex
 ```
-
-El script pide confirmación y la palabra `BORRAR`. Cierra el bot antes de ejecutarlo.
 
 ---
 
@@ -129,16 +112,12 @@ Free route traffic monitor using OpenRouteService, TomTom Traffic, and Nominatim
 ## Install
 
 ```powershell
-git clone https://github.com/StreckerMX/route-accident-bot-free.git; cd route-accident-bot-free; Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; .\Install-RouteAccidentBotFree.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass; irm https://raw.githubusercontent.com/StreckerMX/route-accident-bot-free/main/Install-Remote.ps1 | iex
 ```
 
 ## Run
 
-```powershell
-.\Start-RouteAccidentBotFree.ps1
-```
-
-Opens the graphical interface. Paste a Google Maps route link, click **Analizar enlace**, then **Iniciar monitoreo**.
+Desktop shortcut or re-run install command. Click **Analizar ruta**.
 
 ## Free API signup
 

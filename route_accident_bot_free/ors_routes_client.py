@@ -34,12 +34,15 @@ class OrsRoutesClient:
         origin: list[float],
         destination: list[float],
         alternatives: int,
+        avoid_tolls: bool = False,
     ) -> requests.Response:
         body: dict[str, Any] = {
             "coordinates": [origin, destination],
             "language": "es",
             "units": "km",
         }
+        if avoid_tolls:
+            body["options"] = {"avoid_features": ["tollways"]}
         if alternatives > 0:
             body["alternative_routes"] = {
                 "target_count": alternatives,
@@ -59,6 +62,7 @@ class OrsRoutesClient:
         origin_coords: tuple[float, float],
         destination_coords: tuple[float, float],
         alternatives: int = 2,
+        avoid_tolls: bool = False,
     ) -> list[dict[str, Any]]:
         origin = [origin_coords[1], origin_coords[0]]
         destination = [destination_coords[1], destination_coords[0]]
@@ -77,7 +81,7 @@ class OrsRoutesClient:
                 f"(limite gratuito ORS: 100 km)."
             )
 
-        response = self._request_routes(origin, destination, use_alternatives)
+        response = self._request_routes(origin, destination, use_alternatives, avoid_tolls)
 
         if response.status_code == 400 and use_alternatives > 0:
             try:
@@ -87,7 +91,7 @@ class OrsRoutesClient:
             if error_code == 2004:
                 use_alternatives = 0
                 self.last_route_note = "Ruta demasiado larga para alternativas ORS. Usando ruta unica."
-                response = self._request_routes(origin, destination, 0)
+                response = self._request_routes(origin, destination, 0, avoid_tolls)
 
         response.raise_for_status()
         data = response.json()

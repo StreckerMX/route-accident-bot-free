@@ -1,17 +1,12 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Elimina por completo Route Accident Bot FREE y todos sus archivos.
-.DESCRIPTION
-    Borra el entorno virtual, configuracion, claves (.env) y el resto del proyecto.
-    La carpeta del repositorio se eliminara al finalizar este script.
-.EXAMPLE
-    .\Uninstall-RouteAccidentBotFree.ps1
+    Elimina Route Accident Bot FREE y todos sus archivos.
 #>
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = $PSScriptRoot
 $ConfirmWord = "BORRAR"
+$LocalAppDir = Join-Path $env:LOCALAPPDATA "RouteAccidentBotFree"
 
 function Read-YesNo {
     param([string]$Prompt, [bool]$DefaultYes = $false)
@@ -21,59 +16,42 @@ function Read-YesNo {
     return $answer -in @("s", "si", "sí", "y", "yes")
 }
 
-Clear-Host
-Write-Host ""
-Write-Host "  Route Accident Bot FREE - Desinstalacion completa" -ForegroundColor Red
-Write-Host ""
-Write-Host "  Se eliminara TODO en:" -ForegroundColor Yellow
-Write-Host "    $ProjectRoot" -ForegroundColor White
-Write-Host ""
-Write-Host "  Incluye: codigo, venv, .env, configuracion y datos locales." -ForegroundColor Yellow
-Write-Host "  Cierra la aplicacion antes de continuar." -ForegroundColor Yellow
-Write-Host ""
-
-if (-not (Read-YesNo "  Continuar con la desinstalacion" $false)) {
-    Write-Host "`n  Cancelado. No se borro nada.`n" -ForegroundColor Green
-    exit 0
-}
-
-$typed = (Read-Host "  Escribe $ConfirmWord para confirmar").Trim()
-if ($typed -ne $ConfirmWord) {
-    Write-Host "`n  Confirmacion incorrecta. No se borro nada.`n" -ForegroundColor Green
-    exit 0
-}
-
-Write-Host "`n  Eliminando archivos..." -ForegroundColor Cyan
-
-$scriptPath = $PSCommandPath
-$failed = [System.Collections.Generic.List[string]]::new()
-
-Get-ChildItem -LiteralPath $ProjectRoot -Force | ForEach-Object {
-    if ($_.FullName -eq $scriptPath) {
-        return
-    }
+function Remove-ProjectDir([string]$ProjectRoot) {
+    if (-not (Test-Path $ProjectRoot)) { return $true }
     try {
-        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
-        Write-Host "  Eliminado: $($_.Name)" -ForegroundColor DarkGray
+        Remove-Item -LiteralPath $ProjectRoot -Recurse -Force
+        return $true
     } catch {
-        $failed.Add($_.Name)
-        Write-Host "  No se pudo eliminar: $($_.Name)" -ForegroundColor Yellow
+        Write-Host "  No se pudo eliminar $ProjectRoot" -ForegroundColor Yellow
+        return $false
     }
 }
 
-if ($failed.Count -gt 0) {
-    Write-Host ""
-    Write-Host "  Algunos elementos siguen en uso. Cierra Python/terminal y ejecuta de nuevo," -ForegroundColor Yellow
-    Write-Host "  o borra manualmente la carpeta:" -ForegroundColor Yellow
-    Write-Host "    $ProjectRoot`n" -ForegroundColor White
-    exit 1
+Clear-Host
+Write-Host "`n  Route Accident Bot FREE - Desinstalacion`n" -ForegroundColor Red
+
+$targets = @()
+if (Test-Path $LocalAppDir) { $targets += $LocalAppDir }
+if ((Test-Path $PSScriptRoot) -and ($PSScriptRoot -notin $targets)) { $targets += $PSScriptRoot }
+
+if ($targets.Count -eq 0) {
+    Write-Host "  No se encontro ninguna instalacion.`n" -ForegroundColor Yellow
+    exit 0
 }
 
-Write-Host ""
-Write-Host "  Programando eliminacion de la carpeta del proyecto..." -ForegroundColor Cyan
+Write-Host "  Se eliminara:" -ForegroundColor Yellow
+$targets | ForEach-Object { Write-Host "    $_" -ForegroundColor White }
 
-$deleteCmd = "timeout /t 2 /nobreak >nul & rmdir /s /q `"$ProjectRoot`""
-Start-Process -FilePath "cmd.exe" -ArgumentList "/c $deleteCmd" -WindowStyle Hidden | Out-Null
+if (-not (Read-YesNo "  Continuar" $false)) { exit 0 }
+if ((Read-Host "  Escribe $ConfirmWord para confirmar").Trim() -ne $ConfirmWord) { exit 0 }
 
-Write-Host "  Desinstalacion completada. La carpeta desaparecera en unos segundos.`n" -ForegroundColor Green
-exit 0
+foreach ($dir in $targets) {
+    Write-Host "`n  Eliminando $dir ..." -ForegroundColor Cyan
+    Remove-ProjectDir $dir | Out-Null
+}
+
+$desktop = [Environment]::GetFolderPath("Desktop")
+$shortcut = Join-Path $desktop "Route Accident Bot FREE.lnk"
+if (Test-Path $shortcut) { Remove-Item $shortcut -Force }
+
+Write-Host "`n  Desinstalacion completada.`n" -ForegroundColor Green
