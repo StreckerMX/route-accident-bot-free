@@ -111,6 +111,7 @@ def main() -> int:
         return 1
 
     last_alert_at: float | None = None
+    route_note_shown = False
 
     try:
         while True:
@@ -119,6 +120,10 @@ def main() -> int:
                 routes = routes_client.compute_routes(
                     origin_coords, destination_coords, alternatives=alternatives
                 )
+
+                if routes_client.last_route_note and not route_note_shown:
+                    print(f"  Nota: {routes_client.last_route_note}")
+                    route_note_shown = True
 
                 if not routes:
                     print(f"[{now.strftime('%H:%M:%S')}] Sin rutas disponibles.")
