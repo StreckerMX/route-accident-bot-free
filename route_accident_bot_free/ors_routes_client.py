@@ -7,7 +7,7 @@ from typing import Any
 
 import requests
 
-ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/json"
+ORS_URL = "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
 MAX_ALTERNATIVES_DISTANCE_KM = 95.0
 
 
