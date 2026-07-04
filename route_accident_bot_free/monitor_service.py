@@ -13,7 +13,12 @@ from typing import Any
 import requests
 from dotenv import load_dotenv
 
-from .alert_reporter import format_alert, format_alert_telegram, format_ok_check
+from .alert_reporter import (
+    AlertResult,
+    format_alert_telegram,
+    format_operational_alert_log,
+    format_operational_ok_log,
+)
 from .config_state import SETTINGS_FILE, load_config, save_config
 from .news_investigator import Investigator
 from .nominatim_geocoder import LocationInfo, NominatimGeocoder
@@ -33,6 +38,7 @@ class RouteMonitor:
         config: dict[str, Any],
         on_log: Callable[[str], None] | None = None,
         on_status: Callable[[str], None] | None = None,
+        on_alert: Callable[[AlertResult], None] | None = None,
         on_maps_link: Callable[[str, str], None] | None = None,
         origin_coords: tuple[float, float] | None = None,
         destination_coords: tuple[float, float] | None = None,
@@ -41,6 +47,7 @@ class RouteMonitor:
         self.config = config
         self.on_log = on_log or print
         self.on_status = on_status or (lambda _: None)
+        self.on_alert = on_alert or (lambda _result: None)
         self.on_maps_link = on_maps_link or (lambda _url, _label: None)
         self.origin_coords_override = origin_coords
         self.destination_coords_override = destination_coords
@@ -146,15 +153,20 @@ class RouteMonitor:
         return "Libre (sin cuota)" if self.road_preference == "free" else "Cuota"
 
     def print_banner(self) -> None:
-        self._log("=" * 50)
-        self._log("  Route Accident Bot FREE - Analisis de ruta")
-        self._log("=" * 50)
-        self._log(f"  Origen:      {self.origin}")
-        self._log(f"  Destino:     {self.destination}")
-        self._log(f"  Carretera:   {self._road_label()}")
-        self._log(f"  Telegram:    {'activo' if self.telegram_enabled else 'desactivado'}")
-        self._log("=" * 50)
-        self._log("")
+        telegram = "activo" if self.telegram_enabled else "desactivado"
+        self._log(
+            f"Iniciando analisis: {self.origin} -> {self.destination} "
+            f"({self._road_label()}, Telegram {telegram})"
+        )
+
+    def _maps_link_for_alert(self, recommendation: Any | None) -> tuple[str, str]:
+        if recommendation and recommendation.action in ("CAMBIAR_RUTA", "CONSIDERAR_ALTERNATIVA"):
+            label = f"Abrir {recommendation.best_route_label} en Google Maps"
+            url = self.maps_link or recommendation.maps_url
+        else:
+            label = "Abrir ruta en Google Maps"
+            url = self.maps_link or (recommendation.maps_url if recommendation else "")
+        return url, label
 
     def run_once(self) -> None:
         now = datetime.now()
@@ -167,11 +179,11 @@ class RouteMonitor:
             )
 
             if self.routes_client.last_route_note and not self._route_note_shown:
-                self._log(f"  Nota: {self.routes_client.last_route_note}")
+                self._log(f"Nota: {self.routes_client.last_route_note}")
                 self._route_note_shown = True
 
             if not routes:
-                self._log(f"[{now.strftime('%H:%M:%S')}] Sin rutas disponibles.")
+                self._log("Sin rutas disponibles.")
                 return
 
             all_coords: list[list[float]] = []
@@ -189,10 +201,7 @@ class RouteMonitor:
                 )
 
                 if in_cooldown:
-                    self._log(
-                        f"[{now.strftime('%H:%M:%S')}] Incidente detectado "
-                        f"(cooldown {self.cooldown} min)"
-                    )
+                    self._log(f"Incidente detectado (cooldown activo, {self.cooldown} min)")
                 else:
                     main_event = primary.events[0] if primary.events else None
 
@@ -213,17 +222,20 @@ class RouteMonitor:
                         analyses, self.origin, self.destination, self.switch_threshold
                     )
 
-                    self._log(
-                        format_alert(
-                            timestamp=now,
-                            primary=primary,
-                            main_event=main_event,
-                            location=location,
-                            news=news,
-                            comparisons=comparisons,
-                            recommendation=recommendation,
-                        )
+                    maps_url, maps_label = self._maps_link_for_alert(recommendation)
+                    alert = AlertResult(
+                        timestamp=now,
+                        primary=primary,
+                        main_event=main_event,
+                        location=location,
+                        news=news,
+                        comparisons=comparisons,
+                        recommendation=recommendation,
+                        maps_url=maps_url,
+                        maps_label=maps_label,
                     )
+                    self.on_alert(alert)
+                    self._log(format_operational_alert_log(primary, recommendation))
                     self._notify_maps_link(recommendation)
 
                     if self.telegram_enabled and self.notify_on_alert:
@@ -240,25 +252,24 @@ class RouteMonitor:
                                 )
                             )
                         except Exception as exc:
-                            self._log(f"  Error de Telegram: {exc}")
+                            self._log(f"Error de Telegram: {exc}")
 
                     self._last_alert_at = time.time()
             else:
-                ok_text = format_ok_check(now, primary)
-                self._log(ok_text)
+                self._log(format_operational_ok_log(primary))
                 self._notify_maps_link(None)
                 if self.telegram_enabled and self.notify_on_ok:
                     try:
-                        self.telegram.send(ok_text, parse_mode=None)
+                        self.telegram.send(format_operational_ok_log(primary), parse_mode=None)
                     except Exception:
                         pass
 
         except requests.HTTPError as exc:
-            self._log(f"[{now.strftime('%H:%M:%S')}] Error HTTP: {exc}")
+            self._log(f"Error HTTP: {exc}")
             if exc.response is not None:
-                self._log(f"  Detalle: {exc.response.text[:300]}")
+                self._log(f"Detalle API: {exc.response.text[:200]}")
         except Exception as exc:
-            self._log(f"[{now.strftime('%H:%M:%S')}] Error: {exc}")
+            self._log(f"Error: {exc}")
 
     def _analysis_loop(self) -> None:
         self.on_status("Analizando")
