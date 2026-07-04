@@ -51,19 +51,11 @@ El instalador pedirá:
 
 ## Uso
 
-**Interfaz gráfica (recomendado):**
-
-```powershell
-.\Start-RouteAccidentBotFreeGui.ps1
-```
-
-Pega un enlace de Google Maps, pulsa **Analizar enlace** y luego **Iniciar monitoreo**.
-
-**Consola:**
-
 ```powershell
 .\Start-RouteAccidentBotFree.ps1
 ```
+
+Se abre la interfaz gráfica. Pega un enlace de Google Maps, pulsa **Analizar enlace** y luego **Iniciar monitoreo**. Usa **Detener** para pausar el monitoreo.
 
 **Configuración por defecto:**
 - Revisión cada **45 minutos**
@@ -145,6 +137,8 @@ git clone https://github.com/StreckerMX/route-accident-bot-free.git; cd route-ac
 ```powershell
 .\Start-RouteAccidentBotFree.ps1
 ```
+
+Opens the graphical interface. Paste a Google Maps route link, click **Analizar enlace**, then **Iniciar monitoreo**.
 
 ## Free API signup
 
