@@ -9,6 +9,7 @@ import customtkinter as ctk
 
 from .config_state import SETTINGS_FILE, load_config, save_config, write_env_file
 from .google_maps_link_parser import GoogleMapsLinkError, parse_google_maps_link
+from .ui_helpers import add_labeled_entry_with_paste
 
 
 class SetupWizard(ctk.CTk):
@@ -24,8 +25,8 @@ class SetupWizard(ctk.CTk):
         ctk.set_default_color_theme("blue")
 
         self.title("Configuracion - Route Accident Bot FREE")
-        self.geometry("640x760")
-        self.minsize(560, 680)
+        self.geometry("640x800")
+        self.minsize(560, 720)
 
         self._build_ui()
         self.protocol("WM_DELETE_WINDOW", self._cancel)
@@ -37,17 +38,9 @@ class SetupWizard(ctk.CTk):
         form = ctk.CTkScrollableFrame(self)
         form.pack(fill="both", expand=True, padx=16, pady=8)
 
-        ctk.CTkLabel(form, text="API Key - OpenRouteService").pack(anchor="w", padx=8, pady=(8, 0))
-        self.ors_key_entry = ctk.CTkEntry(form, show="*")
-        self.ors_key_entry.pack(fill="x", padx=8, pady=4)
-
-        ctk.CTkLabel(form, text="API Key - TomTom").pack(anchor="w", padx=8, pady=(8, 0))
-        self.tomtom_key_entry = ctk.CTkEntry(form, show="*")
-        self.tomtom_key_entry.pack(fill="x", padx=8, pady=4)
-
-        ctk.CTkLabel(form, text="Correo para Nominatim (recomendado)").pack(anchor="w", padx=8, pady=(8, 0))
-        self.email_entry = ctk.CTkEntry(form)
-        self.email_entry.pack(fill="x", padx=8, pady=4)
+        self.ors_key_entry = add_labeled_entry_with_paste(form, "API Key - OpenRouteService", show="*")
+        self.tomtom_key_entry = add_labeled_entry_with_paste(form, "API Key - TomTom", show="*")
+        self.email_entry = add_labeled_entry_with_paste(form, "Correo para Nominatim (recomendado)")
 
         ctk.CTkLabel(form, text="Enlace de Google Maps").pack(anchor="w", padx=8, pady=(12, 0))
         link_row = ctk.CTkFrame(form, fg_color="transparent")
@@ -71,12 +64,8 @@ class SetupWizard(ctk.CTk):
         ctk.CTkCheckBox(form, text="Activar Telegram (opcional)", variable=self.telegram_var, command=self._toggle_telegram).pack(anchor="w", padx=8, pady=4)
         self.telegram_frame = ctk.CTkFrame(form, fg_color="transparent")
         self.telegram_frame.pack(fill="x", padx=8, pady=4)
-        ctk.CTkLabel(self.telegram_frame, text="Token").pack(anchor="w")
-        self.telegram_token_entry = ctk.CTkEntry(self.telegram_frame, show="*")
-        self.telegram_token_entry.pack(fill="x", pady=2)
-        ctk.CTkLabel(self.telegram_frame, text="Chat ID").pack(anchor="w")
-        self.telegram_chat_entry = ctk.CTkEntry(self.telegram_frame)
-        self.telegram_chat_entry.pack(fill="x", pady=2)
+        self.telegram_token_entry = add_labeled_entry_with_paste(self.telegram_frame, "Token de Telegram", show="*")
+        self.telegram_chat_entry = add_labeled_entry_with_paste(self.telegram_frame, "Chat ID de Telegram")
         self._toggle_telegram()
 
         self.status_label = ctk.CTkLabel(self, text="", text_color="orange")
@@ -86,9 +75,8 @@ class SetupWizard(ctk.CTk):
 
     def _toggle_telegram(self) -> None:
         state = "normal" if self.telegram_var.get() else "disabled"
-        for child in self.telegram_frame.winfo_children():
-            if isinstance(child, ctk.CTkEntry):
-                child.configure(state=state)
+        self.telegram_token_entry.configure(state=state)
+        self.telegram_chat_entry.configure(state=state)
 
     def _paste_link(self) -> None:
         try:
