@@ -53,7 +53,7 @@ class TomTomIncidentsClient:
     def _fetch_bbox(self, coordinates: list[list[float]]) -> list[TrafficIncident]:
         lngs = [c[0] for c in coordinates]
         lats = [c[1] for c in coordinates]
-        padding = 0.05
+        padding = 0.015
         bbox = f"{min(lngs) - padding},{min(lats) - padding},{max(lngs) + padding},{max(lats) + padding}"
 
         response = requests.get(

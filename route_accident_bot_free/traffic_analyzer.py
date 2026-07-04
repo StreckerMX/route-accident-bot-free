@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .ors_routes_client import OrsRoutesClient
+from .route_geometry import point_to_polyline_distance_km
 from .tomtom_incidents_client import TrafficIncident
+
+MAX_INCIDENT_DISTANCE_KM = 2.0
 
 
 @dataclass
@@ -46,6 +49,33 @@ def _incidents_to_events(incidents: list[TrafficIncident]) -> list[TrafficEvent]
     return events
 
 
+def _incidents_on_route(
+    incidents: list[TrafficIncident],
+    coordinates: list[list[float]],
+    max_distance_km: float = MAX_INCIDENT_DISTANCE_KM,
+) -> list[TrafficIncident]:
+    if not coordinates:
+        return []
+    return [
+        incident
+        for incident in incidents
+        if point_to_polyline_distance_km(incident.lat, incident.lng, coordinates) <= max_distance_km
+    ]
+
+
+def pick_main_event(events: list[TrafficEvent], coordinates: list[list[float]]) -> TrafficEvent | None:
+    if not events:
+        return None
+    severity_rank = {"ALTA": 0, "MEDIA": 1, "BAJA": 2}
+    return sorted(
+        events,
+        key=lambda event: (
+            severity_rank.get(event.severity, 9),
+            point_to_polyline_distance_km(event.lat, event.lng, coordinates),
+        ),
+    )[0]
+
+
 def analyze_routes(
     routes: list[dict],
     incidents: list[TrafficIncident],
@@ -56,20 +86,27 @@ def analyze_routes(
 
     durations = [OrsRoutesClient.duration_minutes(r) for r in routes]
     fastest = min(durations)
-    events = _incidents_to_events(incidents)
-    max_incident_delay = max((i.delay_minutes for i in incidents), default=0)
-    has_major_incident = any(i.severity == "ALTA" for i in incidents)
 
     analyses: list[RouteAnalysis] = []
     for route in routes:
+        coordinates = route.get("coordinates", [])
+        route_incidents = _incidents_on_route(incidents, coordinates)
+        events = _incidents_to_events(route_incidents)
+
         duration = OrsRoutesClient.duration_minutes(route)
         route_delay = max(0, duration - fastest)
-        effective_delay = max(route_delay, max_incident_delay)
+        max_incident_delay = max((inc.delay_minutes for inc in route_incidents), default=0)
+        has_major_incident = any(inc.severity == "ALTA" for inc in route_incidents)
+        has_medium_delay = any(
+            inc.severity == "MEDIA" and inc.delay_minutes >= delay_threshold_minutes
+            for inc in route_incidents
+        )
 
-        has_severe = bool(incidents) and (
-            has_major_incident
-            or effective_delay >= delay_threshold_minutes
-            or any(i.severity == "MEDIA" and i.delay_minutes >= delay_threshold_minutes for i in incidents)
+        effective_delay = max(route_delay, max_incident_delay) if route_incidents else route_delay
+        has_severe = (
+            effective_delay >= delay_threshold_minutes
+            or has_major_incident
+            or has_medium_delay
         )
 
         analyses.append(
@@ -79,7 +116,7 @@ def analyze_routes(
                 duration_minutes=duration,
                 delay_minutes=effective_delay,
                 distance_km=route.get("distance_km", 0),
-                warnings=[inc.description for inc in incidents[:3]],
+                warnings=[inc.description for inc in route_incidents[:3]],
                 events=events,
                 has_severe_jam=has_severe,
             )

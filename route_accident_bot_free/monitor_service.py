@@ -26,7 +26,7 @@ from .ors_routes_client import OrsRoutesClient
 from .route_advisor import compare_routes, recommend
 from .telegram_notifier import TelegramNotifier
 from .tomtom_incidents_client import TomTomIncidentsClient
-from .traffic_analyzer import analyze_routes
+from .traffic_analyzer import analyze_routes, pick_main_event
 
 __all__ = ["RouteMonitor", "load_config", "save_config", "SETTINGS_FILE"]
 
@@ -186,11 +186,9 @@ class RouteMonitor:
                 self._log("Sin rutas disponibles.")
                 return
 
-            all_coords: list[list[float]] = []
-            for route in routes:
-                all_coords.extend(route.get("coordinates", []))
-
-            incidents = self.incidents_client.fetch_incidents(all_coords)
+            primary_route = routes[0]
+            primary_coords = primary_route.get("coordinates", [])
+            incidents = self.incidents_client.fetch_incidents(primary_coords)
             analyses = analyze_routes(routes, incidents, self.delay_threshold)
             primary = analyses[0]
 
@@ -203,13 +201,13 @@ class RouteMonitor:
                 if in_cooldown:
                     self._log(f"Incidente detectado (cooldown activo, {self.cooldown} min)")
                 else:
-                    main_event = primary.events[0] if primary.events else None
+                    main_event = pick_main_event(primary.events, primary_coords)
 
                     if main_event:
                         location = self.geocoder.reverse(main_event.lat, main_event.lng)
                     else:
                         location = LocationInfo(
-                            formatted_address="Ubicacion no determinada",
+                            formatted_address="Congestion detectada sobre la ruta analizada",
                             road="",
                             neighborhood="",
                             city="",
